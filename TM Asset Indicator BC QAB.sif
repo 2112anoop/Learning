@@ -1,0 +1,1238 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<REPOSITORY
+   NAME="Siebel Repository"
+   UPDATED="06/08/2021 02:35:29"
+   UPDATED_BY="SADMIN"
+   CREATED="06/08/2021 00:01:50"
+   CREATED_BY="SADMIN"
+   FIO_PLACEHOLDER_FIO="TRUE">
+	<PROJECT
+	   ALLOW_OBJECT_LOCKING="N"
+	   INACTIVE="N"
+	   LANGUAGE_LOCKED="ENU"
+	   LOCKED="Y"
+	   NAME="TM Work"
+	   UI_FREEZE="N"
+	   LOCKED_BY_NAME="SADMIN"
+	   UPDATED="03/13/2023 12:24:41"
+	   UPDATED_BY="SADMIN"
+	   CREATED="07/07/2015 14:39:03"
+	   CREATED_BY="SADMIN"
+	   FIO_PLACEHOLDER_FIO="TRUE">
+		<BUSINESS_COMPONENT
+		   CACHE_DATA="N"
+		   CLASS="CSSBCSHMAsset"
+		   COMMENTS="20171026:NIWAS:New BC for QAB"
+		   DIRTY_READS="Y"
+		   DISTINCT="N"
+		   FORCE_ACTIVE="N"
+		   GENREASSIGNACT="N"
+		   INACTIVE="N"
+		   INSERT_UPDATE_ALL_COLUMNS="N"
+		   LOG_CHANGES="Y"
+		   MULTI_RECIPIENT_SELECT="N"
+		   NAME="TM Asset Indicator BC QAB"
+		   NO_DELETE="N"
+		   NO_INSERT="N"
+		   NO_MERGE="N"
+		   NO_UPDATE="N"
+		   OBJECT_LANGUAGE_LOCKED="ENU"
+		   OBJECT_LOCKED="N"
+		   OWNER_DELETE="N"
+		   POPUP_VISIBILITY_AUTO_ALL="N"
+		   SCRIPTED="Y"
+		   TABLE="S_ASSET"
+		   TYPE="Non-Transient"
+		   UPDATED="07/23/2021 12:51:01"
+		   UPDATED_BY="SADMIN"
+		   CREATED="11/03/2017 20:54:38"
+		   CREATED_BY="SADMIN">
+			<BUSCOMP_SERVER_SCRIPT
+			   INACTIVE="N"
+			   NAME="BusComp_InvokeMethod"
+			   PROGRAM_LANGUAGE="JS"
+			   SCRIPT="function BusComp_InvokeMethod (MethodName)
+{
+
+}"
+			   SEQUENCE="4"
+			   UPDATED="11/11/2020 21:45:24"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/11/2020 21:45:24"
+			   CREATED_BY="SADMIN">
+			</BUSCOMP_SERVER_SCRIPT>
+			<BUSCOMP_SERVER_SCRIPT
+			   INACTIVE="N"
+			   NAME="BusComp_PreInvokeMethod"
+			   PROGRAM_LANGUAGE="JS"
+			   SCRIPT="function BusComp_PreInvokeMethod (MethodName)
+{
+	try
+	{
+		var svcOTA = TheApplication().GetService(&quot;TM Quick Buttons_client1&quot;);//renamed it to TM Quick Buttons_client1 for again using client side bc;
+		var Input = TheApplication().NewPropertySet();
+		var Output = TheApplication().NewPropertySet();
+		var sView,asstId,astId,checkDND;
+		var bo = TheApplication().ActiveBusObject();
+		var bc = bo.GetBusComp(&quot;Asset Mgmt - Asset&quot;);
+		var bcSR = bo.GetBusComp(&quot;Service Request&quot;);
+		var busCompOrder = bo.GetBusComp(&quot;Asset Mgmt - Asset (Order Mgmt)&quot;);
+		var strCircleName,strBillIntegId,strCircleCode,kCircle;
+		var oSerBC,isRecVBC,strSerName,strDNDDesc,strDNDStatus,isRec,sPaymentType,sCircle;
+		var sPostpaidProdName,boLookup,bcLookup,recCount,sRec,sProdType,sProdSubType;
+		var oBS,psIp,psOp,ProductId,sProdName,sQueryProdResult,sProdNamePass=&quot;&quot;,sPartNum=&quot;&quot;;
+		var oBS1,psIp1,psOp1,strSTOPStatus,sQueryProdResult1,sQueryProdResult2,sProdName1,sProdName2,sProdBC,sExpr;
+		var MIBsubtype = TheApplication().InvokeMethod(&quot;LookupValue&quot;, &quot;MIBsubtype&quot;, &quot;MIBsubtype&quot;);
+		var sMedia, sSubMedia, MediaChk, SubMediaChk;//DM19500
+		var boBillAcc = TheApplication().GetBusObject(&quot;TM Billing Account&quot;);
+		var bcPay = boBillAcc.GetBusComp(&quot;SIA Payment&quot;);
+        var bcCUTInv = boBillAcc.GetBusComp(&quot;CUT Invoice Sub Accounts&quot;);
+	
+		var sAssetId,sMSISDN,sCircle,sPaymentType,bsWPM,psIp,psOp,sSRId,psInput,psOutput;
+
+	var sPromSub,sProdSub,isRecord1,sPartNum;
+	 var bo3 = TheApplication().GetBusObject(&quot;Admin ISS Product Definition&quot;);
+     var bc3 = bo3.GetBusComp(&quot;Internal Product - ISS Admin&quot;);
+	 Input.SetProperty(&quot;Asset Id&quot;,this.GetFieldValue(&quot;Asset Id&quot;));   //SOMIK:06-05-2018:Added code to handle Duplicate TV SRs
+		if (&quot;OTA Setting&quot; == MethodName)
+		 {
+		 	bc.ActivateField(&quot;Asset Id&quot;);
+			astId=bc.GetFieldValue(&quot;Asset Id&quot;);
+			Input.SetProperty(&quot;Asset Id&quot;,astId);
+		 	svcOTA.InvokeMethod(&quot;OTA Setting&quot;, Input, Output);
+			 return (CancelOperation);  
+		 }
+		 if(&quot;Dedupe&quot; == MethodName) //20190531:SULAGNAS Added code for DM18045
+		 {
+			 sAssetId = bc.GetFieldValue(&quot;Asset Id&quot;);
+			 psInput = TheApplication().NewPropertySet();
+			psOutput = TheApplication().NewPropertySet();
+			bsWPM   = TheApplication().GetService(&quot;Workflow Process Manager&quot;);
+			psInput.SetProperty(&quot;Object Id&quot;,sAssetId);
+			psInput.SetProperty(&quot;ProcessName&quot;,&quot;TM DeDup Req Response WF&quot;);
+			bsWPM.InvokeMethod(&quot;RunProcess&quot;,psInput,psOutput);
+			return (CancelOperation);    
+            			
+		 }
+if(&quot;Take Payment&quot; == MethodName)//DM19211 Start
+		 {
+		var vBillAccId = &quot;&quot;, sAsset, sOrg,accIntId;
+		var gotoViewName = &quot;TM Billing Account Payments View&quot;;
+        var sAssetId = TheApplication().GetProfileAttr(&quot;sAssetId&quot;);
+		
+        with(bc)
+		{   SetViewMode(AllView);
+			ActivateField(&quot;Billing Account Id&quot;);
+			ActivateField(&quot;Billing Account Integration Id&quot;);
+			ClearToQuery();
+			SetSearchSpec(&quot;Id&quot;, sAssetId);
+			ExecuteQuery(ForwardOnly);
+			if (FirstRecord())
+			{
+				vBillAccId = GetFieldValue(&quot;Billing Account Id&quot;);
+				sAsset = GetFieldValue(&quot;Serial Number&quot;);
+				sOrg = GetFieldValue(&quot;Organization&quot;);
+				accIntId = GetFieldValue(&quot;Billing Account Integration Id&quot;);
+			}}
+		with(bcCUTInv)
+        {
+            SetViewMode(AllView);
+            ClearToQuery();
+            SetSearchSpec(&quot;Id&quot;, vBillAccId);
+            ExecuteQuery(ForwardOnly);
+            if (FirstRecord())
+            {
+                TheApplication().GotoView(gotoViewName, boBillAcc);
+            }
+		}
+		with(bcPay)
+		{
+			var svc,psIp,psOp,nARBalance,strBillIntegId,strCircleCode,strCircleName;
+			ActivateField(&quot;Payment Amount&quot;);
+			ActivateField(&quot;TM Outstanding Amount&quot;);
+			ActivateField(&quot;TM Billing Account Id&quot;);
+			ActivateField(&quot;TM Billing Int Id Calc&quot;);
+			ActivateField(&quot;TM MSISDN&quot;);
+			ActivateField(&quot;MSISDN New&quot;);
+			ActivateField(&quot;Asset Id&quot;);
+			strCircleCode = TheApplication().EAILookup(&quot;External&quot;, &quot;CIRCLE_CODE_SIEBEL&quot;, sOrg);
+			SetViewMode(AllView);
+            ClearToQuery();
+            SetSearchSpec(&quot;TM MSISDN&quot;, sAsset);
+            ExecuteQuery(ForwardOnly);
+            if (FirstRecord())
+			{strBillIntegId = GetFieldValue(&quot;TM Billing Account Id&quot;);
+				if (strBillIntegId == &quot;&quot; || strBillIntegId == null)
+	            {
+	                strBillIntegId = GetFieldValue(&quot;TM Billing Int Id Calc&quot;);
+	            }
+			}
+			else
+				strBillIntegId = accIntId;
+			svc = TheApplication().GetService(&quot;Workflow Process Manager&quot;);
+            psIp = TheApplication().NewPropertySet();
+            psOp = TheApplication().NewPropertySet();
+            psIp.SetProperty(&quot;ProcessName&quot;, &quot;TM Get Billed Balance WF&quot;);
+            psIp.SetProperty(&quot;BillingAccountIntId&quot;, strBillIntegId);
+            psIp.SetProperty(&quot;CircleId&quot;, strCircleCode);
+            svc.InvokeMethod(&quot;RunProcess&quot;, psIp, psOp);
+            nARBalance = ToNumber(psOp.GetProperty(&quot;arBalance&quot;));
+			NewRecord(NewBefore);
+			if(nARBalance&gt;0)
+			{
+		    SetFieldValue(&quot;Payment Amount&quot;,nARBalance);
+			SetFieldValue(&quot;TM Outstanding Amount&quot;,nARBalance);
+			}
+			SetFieldValue(&quot;Asset Id&quot;, sAssetId);
+			SetFieldValue(&quot;MSISDN New&quot;, sAsset);
+		}
+		return(CancelOperation);    
+         }//DM19211 End
+		 if(&quot;AuthorizedSign&quot; == MethodName) //DM19029:SULAGNAS
+		 {
+			var sAccountId = bc.GetFieldValue(&quot;Service Account Id&quot;);
+			var sBusObj = TheApplication().GetBusObject(&quot;Account&quot;);
+			var sBusComp= sBusObj.GetBusComp(&quot;Account&quot;);
+			with(sBusComp)
+			{
+			ClearToQuery();
+			SetViewMode(AllView);
+            SetSearchSpec(&quot;Id&quot;,sAccountId);
+			ExecuteQuery(ForwardBackward);
+			}			
+			TheApplication().GotoView(&quot;TM Authorized Account Contact View&quot;,sBusObj);
+			return (CancelOperation);    
+         }
+		 if (&quot;Push SMS&quot; == MethodName)//20160608:Manjunath BA:Req 1137: Added the code to send the correct parent id based on view.
+		{	        
+				
+			try//if there are no records in the applet.
+			{
+					bc.ActivateField(&quot;Asset Id&quot;);
+					astId=bc.GetFieldValue(&quot;Asset Id&quot;);
+					Input.SetProperty(&quot;Asset Id&quot;,astId);
+					svcOTA.InvokeMethod(&quot;Push SMS&quot;, Input, Output);
+					return (CancelOperation); 
+				
+			}//try
+			catch(e)
+			{
+				Input.SetProperty(&quot;Asset Id&quot;, &quot;&quot;);
+				svcOTA.InvokeMethod(&quot;Push SMS&quot;, Input, Output);
+				return (CancelOperation);
+			}//catch(e)
+	
+	        
+		 }
+	
+	    // if (&quot;Push SMS&quot; == MethodName) //anshika 17102016 - comented
+	//	 {
+		//	 svcOTA.InvokeMethod(&quot;Push_SMS&quot;, Input, Output);
+		//	 return (CancelOperation); 
+		// }
+		 if (&quot;Activate Full DND&quot; == MethodName)	//SURBHIC: 20170201 Created for Activate DND QAB
+		 {
+			//checkDND = TheApplication().GetProfileAttr(&quot;checkDND&quot;);
+			//if(checkDND &gt;= 0)
+				//TheApplication().RaiseErrorText(&quot;Full DND is already Active&quot;);
+			try{
+			bc.ActivateField(&quot;Organization&quot;);
+			sAssetId = bc.GetFieldValue(&quot;Asset Id&quot;);			
+			sCircle = bc.GetFieldValue(&quot;Organization&quot;);
+			sMSISDN = bc.GetFieldValue(&quot;Serial Number&quot;);
+			sPaymentType = bc.GetFieldValue(&quot;Promotion Payment Type&quot;);
+			bsWPM   = TheApplication().GetService(&quot;Workflow Process Manager&quot;);
+			psIp = TheApplication().NewPropertySet();
+			psOp = TheApplication().NewPropertySet();
+			psIp.SetProperty(&quot;sAssetId&quot;,sAssetId);
+			psIp.SetProperty(&quot;sPaymentType&quot;,sPaymentType);
+			psIp.SetProperty(&quot;sCircle&quot;,sCircle);
+			psIp.SetProperty(&quot;sMSISDN&quot;,sMSISDN);
+			//psIp.SetProperty(&quot;ProcessName&quot;,&quot;TM Activate Full DND WF&quot;);
+			psIp.SetProperty(&quot;ProcessName&quot;,&quot;TM DND Service SR Create WF&quot;);
+			bsWPM.InvokeMethod(&quot;RunProcess&quot;,psIp,psOp);
+			return (CancelOperation); 
+			}
+			catch(e)
+			{
+				throw e;
+			}			
+		 }
+		 
+
+		if (&quot;Data Start&quot; == MethodName)	//JANMEJAY: 20170519 Created for Start Data QAB
+		{
+			var bs   = TheApplication().GetService(&quot;Workflow Process Manager&quot;);
+			var sMSISDN=&quot;&quot;, sSegment=&quot;&quot;, isRecord=&quot;&quot;, kCircle=&quot;&quot;; 
+			
+			
+			try//if there are no records in the applet.
+			{
+				bc.ActivateField(&quot;Asset Id&quot;);
+				bc.ActivateField(&quot;Organization&quot;);
+				astId=bc.GetFieldValue(&quot;Asset Id&quot;);
+				kCircle=bc.GetFieldValue(&quot;Organization&quot;);
+				if(astId != &quot;&quot; &amp;&amp; astId != null)
+				{
+					bc.ClearToQuery(); 
+					bc.SetViewMode(AllView);
+					bc.SetSearchSpec(&quot;Asset Id&quot;,astId); 
+					bc.ExecuteQuery(ForwardOnly);// Query on asset based on astId
+					isRecord = bc.FirstRecord();  
+					if(isRecord)
+					{
+						sPaymentType = bc.GetFieldValue(&quot;Promotion Payment Type&quot;);						
+						sMSISDN=bc.GetFieldValue(&quot;Serial Number&quot;);
+						sSegment=bc.GetFieldValue(&quot;Promotion Payment Type&quot;);								
+						sPromSub=bc.GetFieldValue(&quot;TM Prom Sub Type&quot;);
+						
+						sCircle = bc.GetFieldValue(&quot;Primary Organization Name&quot;);//Look it up against EAI Value Map
+						//Janmejay 11032017 : Added code to check if STOP DATA already active
+						  if(sSegment==&quot;Prepaid&quot;)
+						  {
+							    oSerBC = bo.GetBusComp(&quot;TM Prepaid Services Details VBC&quot;);
+							    oSerBC.SetViewMode(AllView);
+							    oSerBC.ActivateField(&quot;Asset Id&quot;);
+							    oSerBC.ActivateField(&quot;TM Service Name&quot;);
+							    oSerBC.ActivateField(&quot;TM Status&quot;);//TM Status
+							    oSerBC.ClearToQuery();
+							    oSerBC.SetSearchSpec(&quot;Asset Id&quot;, astId);
+							    oSerBC.ExecuteQuery();
+							    isRecVBC = FirstRecord();
+							    while(isRecVBC)
+							    {
+								     strSerName = oSerBC.GetFieldValue(&quot;TM Service Name&quot;);
+								     if(strSerName == &quot;STOPDATA&quot;) 
+								     {
+										strSTOPStatus = oSerBC.GetFieldValue(&quot;TM Status&quot;);
+										if(strSTOPStatus == &quot;D&quot;)
+										 {
+											TheApplication().RaiseErrorText(&quot;Data Start is already Active&quot;);
+										 }
+								     }
+								     isRecVBC = oSerBC.NextRecord();
+							    }
+						}//end of if(sSegment==&quot;Prepaid&quot;)
+				
+						else if(sSegment==&quot;Postpaid&quot;)
+						{
+					
+				//		if(sPromSub == &quot;Hybrid Promotion&quot;)
+				//			{
+							
+					if(MIBsubtype!=null &amp;&amp; MIBsubtype!=&quot;&quot; )		
+					{
+					bc3.SetViewMode(AllView);
+					bc3.ClearToQuery();
+				   bc3.ActivateField(&quot;Sub Type&quot;);
+				   bc3.ActivateField(&quot;Organization&quot;);
+				   bc3.ActivateField(&quot;Part #&quot;);
+				   var SearchSpec = &quot;[Sub Type] = &apos;&quot; + MIBsubtype + &quot;&apos; AND [Organization] = &apos;&quot; + kCircle + &quot;&apos;&quot; ;
+				   bc3.SetSearchExpr(SearchSpec);
+                   bc3.ExecuteQuery();
+                   var isRecord1 = FirstRecord();
+	                   if(isRecord1)
+					   {
+						sPartNum = bc3.GetFieldValue(&quot;Part #&quot;);
+					   }
+				   }
+             //  }
+					//	else{											
+							sProdName1= &quot;Mobile_Internet_Barring RC 0 Y_55931856&quot;;
+							sProdName2= &quot;Paygo discount_25153965&quot;;
+							try
+							{	
+							
+								oBS = TheApplication().GetService(&quot;Inbound E-mail Database Operations&quot;);	
+								psIp = TheApplication().NewPropertySet();
+								psOp = TheApplication().NewPropertySet();			
+								psIp.SetProperty(&quot;BusObj&quot;, &quot;Asset Management&quot;);
+								psIp.SetProperty(&quot;BusComp&quot;, &quot;Asset Mgmt - Asset (Order Mgmt)&quot;);
+								psIp.SetProperty(&quot;QueryFields&quot;, &quot;Root Asset Id,Product Part Number&quot;);
+								psIp.SetProperty(&quot;Root Asset Id&quot;, astId);
+								psIp.SetProperty(&quot;Product Part Number&quot;, sPartNum);																			
+								psIp.SetProperty(&quot;ValueFields&quot;, &quot;Product Name&quot;);
+								try
+								{
+									oBS.InvokeMethod(&quot;FindRecord&quot;, psIp, psOp);
+								}
+								catch(e)//e1
+								{
+								//	sQueryProdResult1 = psOp.GetProperty(&quot;Product Name&quot;);
+									if(e == &quot;No record matching the search specification is found.(SBL-CMI-00122)&quot;)
+									{
+										oBS1 = TheApplication().GetService(&quot;Inbound E-mail Database Operations&quot;);	
+										psIp1 = TheApplication().NewPropertySet();
+										psOp1 = TheApplication().NewPropertySet();			
+										psIp1.SetProperty(&quot;BusObj&quot;, &quot;Asset Management&quot;);
+										psIp1.SetProperty(&quot;BusComp&quot;, &quot;Asset Mgmt - Asset (Order Mgmt)&quot;);
+										psIp1.SetProperty(&quot;QueryFields&quot;, &quot;Root Asset Id,Product Name&quot;);
+										psIp1.SetProperty(&quot;Root Asset Id&quot;, astId);
+										psIp1.SetProperty(&quot;Product Name&quot;, sProdName2);						
+										psIp1.SetProperty(&quot;ValueFields&quot;, &quot;Product Name&quot;);
+										try
+										{
+											oBS1.InvokeMethod(&quot;FindRecord&quot;, psIp1, psOp1);
+										}
+										catch(e)//e2
+										{
+											if(e == &quot;No record matching the search specification is found.(SBL-CMI-00122)&quot;)
+											TheApplication().RaiseErrorText(&quot;Data Start is already Active&quot;);	
+										}//end of e2
+									}
+								}//end of e1	
+							
+							}
+							catch(e)
+							{
+								throw e;
+							}
+					//		}						
+						}
+					}
+				}   
+				sAssetId = bc.GetFieldValue(&quot;Asset Id&quot;);
+				Input.SetProperty(&quot;sMSISDN&quot;,sMSISDN);
+				Input.SetProperty(&quot;Scenario&quot;,&quot;DataStart&quot;);
+				Input.SetProperty(&quot;sCircle&quot;,kCircle);
+				Input.SetProperty(&quot;sPaymentType&quot;,sSegment);
+				Input.SetProperty(&quot;sAssetId&quot;,sAssetId);
+				TheApplication().LogError(&apos;BC:QAB&apos;,&apos;sMSISDN : sCircle : sPaymentType: sPromSub : sPartNum : sAssetId&apos;,sMSISDN+&apos;:&apos;+kCircle+&apos;:&apos;+sSegment+&apos;:&apos;+sPromSub+&apos;:&apos;+sPartNum+&apos;:&apos;+sAssetId, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;);
+				if(sPromSub==&quot;Hybrid Promotion&quot; &amp;&amp; sPartNum != null)
+				{
+					Input.SetProperty(&quot;HybridPartNum&quot;,sPartNum);
+				}
+				Input.SetProperty(&quot;ProcessName&quot;,&quot;TM Activate Full DND WF&quot;);
+				bs.InvokeMethod(&quot;RunProcess&quot;,Input,Output);   
+				TheApplication().LogError(&apos;BC:QAB&apos;,&apos;Debug@2018&apos;,&apos;WF Call Done&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;);				
+				return (CancelOperation);                                         
+			}//try
+			catch(e)
+			{
+				throw e;  
+			}//catch(e)
+			
+		}// end of if (&quot;Data Start&quot; == MethodName)
+ //if (&quot;Deactivate Flash&quot; == MethodName)
+		 //{
+		//	 svcOTA.InvokeMethod(&quot;Deactivate Flash&quot;, Input, Output);
+		//	 return (CancelOperation); 
+		 //}
+		// 
+		if(&quot;DataStop&quot; == MethodName)
+		{
+			DataStop();
+			return(CancelOperation); 
+		}
+		if(&quot;ValidateEmailId&quot; == MethodName)//JANAKI M Created for DM20670
+		{
+			CallValidateEmailId();
+			return(CancelOperation); 
+		}
+
+
+		 if (&quot;SIM Lost Suspended&quot; == MethodName)
+		 {
+			 svcOTA.InvokeMethod(&quot;SIM Lost Suspended&quot;, Input, Output);
+			 return (CancelOperation); 
+		 }
+
+		if (&quot;Tele Verification&quot; == MethodName)
+		 {
+			 svcOTA.InvokeMethod(&quot;Tele Verification&quot;, Input, Output);
+			 return (CancelOperation); 
+		 }
+    
+		 if (&quot;Release Bar&quot; == MethodName)
+		 {
+			bc.ActivateField(&quot;Asset Id&quot;);
+			astId=bc.GetFieldValue(&quot;Asset Id&quot;);
+			strCircleName = bc.GetFieldValue(&quot;Primary Organization Name&quot;);//Look it up against EAI Value Map
+			strBillIntegId= bc.GetFieldValue(&quot;Billing Account Integration Id&quot;);
+			strCircleCode = TheApplication().EAILookup(&quot;External&quot;,&quot;CIRCLE_CODE_SIEBEL&quot;,strCircleName);//can be blank string also
+			
+			Input.SetProperty(&quot;Asset Id&quot;,astId);
+			Input.SetProperty(&quot;strBillIntegId&quot;,strBillIntegId);
+			Input.SetProperty(&quot;strCircleCode&quot;,strCircleCode);	
+			 svcOTA.InvokeMethod(&quot;Release Bar&quot;, Input, Output);
+			 return (CancelOperation); 
+		 }
+		 if (&quot;ReConsentSMS&quot; == MethodName)//DM19500
+		 {
+			try
+			{
+				bc.ActivateField(&quot;Asset Id&quot;);
+				astId=bc.GetFieldValue(&quot;Asset Id&quot;);
+				with(bcSR)
+				{
+					ActivateField(&quot;Asset Id&quot;);
+					ActivateField(&quot;SRRDT&quot;);
+					ActivateField(&quot;Status&quot;);
+					ClearToQuery();
+					SetViewMode(AllView);
+					//var sSRsearch = (&quot;[SRRDT] = &apos;SERV:CHAN:POSTPLANCHAN:Request&apos; AND [Asset Id] = &apos;&quot; + astId + &quot;&apos; AND [Status] = &apos;Open&apos; AND  [Sub-Status] = &apos;Awaiting Consent&apos;&quot;);
+					//VRC:Added for DM20671
+					var sSRsearch = (&quot;([SRRDT] = &apos;SERV:CHAN:POSTPLANCHAN:Request&apos; OR [SRRDT] = &apos;REANCH:VOLU:REFOCH:Request&apos; OR [SRRDT] = &apos;TAROFF:CHAN:RETOFF:Request&apos; OR [SRRDT] = &apos;REANCH:POROUT:UPC:Request&apos; OR [SRRDT] = &apos;DISC:VOLU:POSTTPREMIG:Request&apos; OR [SRRDT] = &apos;TAROFF:CHREPLFA:PLPACH:Request&apos;) AND [Asset Id] = &apos;&quot; + astId + &quot;&apos; AND [Status] = &apos;Open&apos; AND  [Sub-Status] = &apos;Awaiting Consent&apos;&quot;);
+					SetSearchExpr(sSRsearch);
+					SetSortSpec(&quot;Created(DESCENDING)&quot;);
+					ExecuteQuery(ForwardOnly);
+					sRec = FirstRecord();
+					if(sRec)
+					{
+						Input.SetProperty(&quot;Id&quot;,GetFieldValue(&quot;Id&quot;));	
+						svcOTA.InvokeMethod(&quot;PostpaidConsentMsg&quot;, Input, Output);					
+					}//if sRec
+					else
+					{
+						TheApplication().RaiseErrorText(&quot;SMS can not be sent for this Subscriber&quot;);
+					}
+				}//with bcSR
+			}//try
+			catch(e)
+			{
+				throw e;
+			}
+			finally
+			{
+				return (CancelOperation); 	
+			}
+		 }
+		return (ContinueOperation);
+	}
+	catch (e)
+	{
+		throw e;
+	}	
+	finally
+	{
+		Output = null;
+		Input = null;
+		svcOTA = null;
+		bs = null;
+		bc = null;
+
+	}
+}"
+			   SEQUENCE="5"
+			   UPDATED="06/15/2021 14:43:17"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/03/2017 20:54:38"
+			   CREATED_BY="SADMIN">
+			</BUSCOMP_SERVER_SCRIPT>
+			<BUSCOMP_SERVER_SCRIPT
+			   INACTIVE="N"
+			   NAME="BusComp_PreSetFieldValue"
+			   PROGRAM_LANGUAGE="JS"
+			   SCRIPT="function BusComp_PreSetFieldValue (FieldName, FieldValue)
+{
+	return (ContinueOperation);
+}"
+			   SEQUENCE="6"
+			   UPDATED="11/11/2020 21:45:24"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/11/2020 21:45:24"
+			   CREATED_BY="SADMIN">
+			</BUSCOMP_SERVER_SCRIPT>
+			<BUSCOMP_SERVER_SCRIPT
+			   INACTIVE="N"
+			   NAME="BusComp_Query"
+			   PROGRAM_LANGUAGE="JS"
+			   SCRIPT="function BusComp_Query ()
+{
+
+}"
+			   SEQUENCE="7"
+			   UPDATED="11/11/2020 21:45:24"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/11/2020 21:45:24"
+			   CREATED_BY="SADMIN">
+			</BUSCOMP_SERVER_SCRIPT>
+			<BUSCOMP_SERVER_SCRIPT
+			   INACTIVE="N"
+			   NAME="CallValidateEmailId"
+			   PROGRAM_LANGUAGE="JS"
+			   SCRIPT="function CallValidateEmailId()
+{
+		var bo = TheApplication().ActiveBusObject();
+		var bc = bo.GetBusComp(&quot;Asset Mgmt - Asset&quot;);
+		var sSys = new Date();
+		sSys = (sSys.getMonth()+1) + &quot;/&quot;+ sSys.getDate() + &quot;/&quot; + sSys.getFullYear() +&quot; &quot;+ sSys.getHours() + &quot;:&quot; + sSys.getMinutes() + &quot;:&quot; + sSys.getSeconds();
+		 //sSys = sSys.getFullYear() + &quot;-&quot;+ (sSys.getMonth()+1) + &quot;-&quot; + sSys.getDate() +&quot; &quot;+ sSys.getHours() + &quot;:&quot; + sSys.getMinutes() + &quot;:&quot; + sSys.getSeconds();
+		 var sCreated,sAssetId,sCustName,sEmail,sConID,sOperator,sMSISDN,sCircle,bsWPM;
+		 var oApp=TheApplication();
+		 var sIdeaInputs = oApp.NewPropertySet();
+		 var sIdeaOutputs = oApp.NewPropertySet();
+		 var psIp,psOp;
+		 //var sIdeacheckBS = oApp.GetService(&quot;TM Check Idea SIM BS&quot;);
+		 try{
+			bc.ActivateField(&quot;Account Name&quot;);
+			//sEmail=bc.GetFieldValue(&quot;Billing Profile Email Address&quot;);
+			sAssetId = bc.GetFieldValue(&quot;Asset Id&quot;);			
+			//sCircle = bc.GetFieldValue(&quot;TM Circle Code&quot;);
+			//sCustName = bc.GetFieldValue(&quot;Account Name&quot;);
+			//sMSISDN = bc.GetFieldValue(&quot;Serial Number&quot;);
+		   // sIdeaInputs.SetProperty(&quot;AssetId&quot;, sAssetId); 
+		    //sIdeacheckBS.InvokeMethod(&quot;CheckIdeaSIM&quot;,sIdeaInputs,sIdeaOutputs);
+			//sIdeaSIM= sIdeaOutputs.GetProperty(&quot;IdeaSIMExists&quot;);
+			bsWPM   = TheApplication().GetService(&quot;Workflow Process Manager&quot;);
+			psIp = TheApplication().NewPropertySet();
+			psOp = TheApplication().NewPropertySet();
+			psIp.SetProperty(&quot;sAssetId&quot;,sAssetId);
+			//psIp.SetProperty(&quot;sOperator&quot;,sOperator);
+			psIp.SetProperty(&quot;sCreated&quot;,sSys);
+			//psIp.SetProperty(&quot;sCircle&quot;,sCircle);
+			//psIp.SetProperty(&quot;sMSISDN&quot;,sMSISDN);
+			//psIp.SetProperty(&quot;sEmail&quot;,sEmail);
+			//psIp.SetProperty(&quot;sCustName&quot;,sCustName);
+			psIp.SetProperty(&quot;sCreateAutoSR&quot;,&quot;Y&quot;);
+			psIp.SetProperty(&quot;ProcessName&quot;,&quot;IBM Notify Email Validation&quot;);
+			bsWPM.InvokeMethod(&quot;RunProcess&quot;,psIp,psOp);
+			return (CancelOperation); 
+			}
+			catch(e)
+			{
+				throw e;
+			}			
+			finally
+			{
+			}
+}"
+			   SEQUENCE="1"
+			   UPDATED="07/23/2021 12:51:01"
+			   UPDATED_BY="SADMIN"
+			   CREATED="06/15/2021 14:43:17"
+			   CREATED_BY="SADMIN">
+			</BUSCOMP_SERVER_SCRIPT>
+			<BUSCOMP_SERVER_SCRIPT
+			   INACTIVE="N"
+			   NAME="CreateReactSR"
+			   PROGRAM_LANGUAGE="JS"
+			   SCRIPT="function CreateReactSR(sAssetId,sReason,sMSISDN)
+{
+try {
+	var sAssetBO = TheApplication().GetBusObject(&quot;Asset Management&quot;);
+    var bcAction = sAssetBO.GetBusComp(&quot;Action Company&quot;);
+	var sSRBC =  sAssetBO.GetBusComp(&quot;Service Request&quot;);
+    with(bcAction)
+	{
+		 ActivateField(&quot;Asset Id&quot;);
+	     ActivateField(&quot;Created&quot;);
+	     ActivateField(&quot;Activity SR Id&quot;);
+	     ClearToQuery();
+	     SetViewMode(AllView);
+	     SetSearchSpec(&quot;Asset Id&quot;, sAssetId);
+	     SetSearchSpec(&quot;Status&quot;, &quot;Open&quot;);
+	     SetSearchSpec(&quot;Activity SR Id&quot;, &quot;is NULL&quot;);
+	     SetSortSpec(&quot;Created(DESCENDING)&quot;);
+	     ExecuteQuery(ForwardOnly); // Query on action based on AssetId
+	     var isRecord = FirstRecord();
+	     if (isRecord)
+		{
+	       var sActId = GetFieldValue(&quot;Id&quot;);
+		}	}
+	  
+     var svc = TheApplication().GetService(&quot;TM Auto Visa Exp SR BS&quot;);
+     var Inputs = TheApplication().NewPropertySet();
+	 var Outputs = TheApplication().NewPropertySet();
+	 Inputs.SetProperty(&quot;MSISDN&quot;,sMSISDN);
+     Inputs.SetProperty(&quot;InteractId&quot;, sActId);
+     Inputs.SetProperty(&quot;DFF1&quot;,&quot;Reason for Reactivation&quot;);
+     Inputs.SetProperty(&quot;DFF2&quot;,&quot;&quot;);
+     Inputs.SetProperty(&quot;DFFVal1&quot;,sReason);
+     Inputs.SetProperty(&quot;AssetId&quot;,sAssetId);
+	 Inputs.SetProperty(&quot;PaymentType&quot;, &quot;Postpaid&quot;);
+     svc.InvokeMethod(&quot;CreateSR_AutoREACT&quot;, Inputs, Outputs);
+     var srid = Outputs.GetProperty(&quot;sSRId&quot;);     var err =    Outputs.GetProperty(&quot;Error Code&quot;);
+	// TheApplication().RaiseErrorText(&quot;Srid..&quot;+srid+&quot;err...&quot;+err);
+	with(sSRBC)
+		{
+			ClearToQuery();
+			SetViewMode(AllView);
+			SetSearchSpec(&quot;Id&quot;, srid);
+			ExecuteQuery();
+			TheApplication().GotoView(&quot;TM Subscription Details View&quot;, sAssetBO);
+		}
+	return (CancelOperation);
+	}
+	catch(e)
+		{
+		throw(e);
+		}
+	finally
+	{
+		Inputs = null;
+		Outputs = null;
+		svc = null;
+		bcAction = null;
+		sSRBC = null;
+        sAssetBO = null;
+	}
+}"
+			   SEQUENCE="2"
+			   UPDATED="11/17/2020 11:54:12"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/11/2020 21:45:24"
+			   CREATED_BY="SADMIN">
+			</BUSCOMP_SERVER_SCRIPT>
+			<BUSCOMP_SERVER_SCRIPT
+			   INACTIVE="N"
+			   NAME="DataStop"
+			   PROGRAM_LANGUAGE="JS"
+			   SCRIPT="function DataStop()
+{
+	//IBM455237 11/11/2020: Added this function for DM20431
+ 	try
+	{
+		var sLstValBO, sLstValBC, sAssetBO, sAssetItemBC, bo, bc, Input, Output, bs;
+		var sPartNumConcat = &quot;&quot;, sRecord, sPartNum = &quot;&quot;, sPartNumOne = &quot;&quot;, astId, kCircle = &quot;&quot;, sMSISDN = &quot;&quot;, sSegment = &quot;&quot;, isRecord, sPaymentType, sPromSub;
+		var sCircle = &quot;&quot;;
+		Input = TheApplication().NewPropertySet();
+		Output = TheApplication().NewPropertySet();
+		bo = TheApplication().ActiveBusObject();
+		bc = bo.GetBusComp(&quot;Asset Mgmt - Asset&quot;);
+		bc.ActivateField(&quot;Asset Id&quot;);
+		bc.ActivateField(&quot;Organization&quot;);
+		bc.ActivateField(&quot;Primary Organization Name&quot;);
+		astId = bc.GetFieldValue(&quot;Asset Id&quot;);
+		kCircle = bc.GetFieldValue(&quot;Organization&quot;);
+		sCircle = bc.GetFieldValue(&quot;Primary Organization Name&quot;);
+		sLstValBO = TheApplication().GetBusObject(&quot;List Of Values&quot;);
+		sLstValBC = sLstValBO.GetBusComp(&quot;List Of Values&quot;);
+		with(sLstValBC)
+		{
+			ClearToQuery();
+			SetViewMode(AllView);
+			ActivateField(&quot;Type&quot;);
+			ActivateField(&quot;Name&quot;);
+			ActivateField(&quot;Value&quot;);
+			SetSearchExpr(&quot;[Type] = &apos;TM_DATASTART_PRODUCT&apos; AND [Name] = &apos;Data Start Product&apos;&quot;);
+			ExecuteQuery();
+			sRecord = FirstRecord();
+			while(sRecord)
+			{
+				if(sRecord == LastRecord())
+				{
+					sPartNum = &quot;[Product Part Number] = &apos;&quot; + GetFieldValue(&quot;Value&quot;) + &quot;&apos;&quot;;
+				}
+				else
+				{
+					sPartNum = &quot;[Product Part Number] = &apos;&quot; + GetFieldValue(&quot;Value&quot;) + &quot;&apos; OR &quot;;
+				}
+				sPartNumConcat = sPartNumConcat + sPartNum;
+				sRecord = NextRecord();
+			}
+		}
+		if(sPartNumConcat != &quot;&quot; &amp;&amp; sPartNumConcat != null)
+		{
+			sAssetBO = TheApplication().GetBusObject(&quot;Asset Management&quot;);
+			sAssetItemBC = sAssetBO.GetBusComp(&quot;Asset Mgmt - Asset (Order Mgmt)&quot;);
+			with(sAssetItemBC)
+			{
+				ClearToQuery();
+				SetViewMode(AllView);
+				ActivateField(&quot;Product Part Number&quot;);
+				ActivateField(&quot;Root Asset Id&quot;);
+				SetSearchExpr(&quot;(&quot; + sPartNumConcat + &quot;) AND [Root Asset Id] = &apos;&quot; + astId + &quot;&apos;&quot;);
+				ExecuteQuery();
+				if(FirstRecord())
+				{
+					TheApplication().RaiseErrorText(&quot;Data Stop is already active on subscriber, so can&apos;t process this request.&quot;);
+				}
+			}
+		
+			bs = TheApplication().GetService(&quot;Workflow Process Manager&quot;);
+	
+			bc.ClearToQuery(); 
+			bc.SetViewMode(AllView);
+			bc.ActivateField(&quot;Asset Id&quot;);
+			bc.ActivateField(&quot;Promotion Payment Type&quot;);
+			bc.ActivateField(&quot;Serial Number&quot;);
+			bc.ActivateField(&quot;TM Prom Sub Type&quot;);
+			bc.SetSearchSpec(&quot;Asset Id&quot;,astId); 
+			bc.ExecuteQuery(ForwardOnly);// Query on asset based on astId
+			isRecord = bc.FirstRecord();  
+			if(isRecord)
+			{
+				sPaymentType = bc.GetFieldValue(&quot;Promotion Payment Type&quot;);						
+				sMSISDN = bc.GetFieldValue(&quot;Serial Number&quot;);
+				sSegment = bc.GetFieldValue(&quot;Promotion Payment Type&quot;);								
+				sPromSub = bc.GetFieldValue(&quot;TM Prom Sub Type&quot;);
+			}			
+			Input.SetProperty(&quot;sMSISDN&quot;,sMSISDN);
+			Input.SetProperty(&quot;Scenario&quot;,&quot;DataStop&quot;);
+			Input.SetProperty(&quot;sCircle&quot;,kCircle);
+			Input.SetProperty(&quot;sPaymentType&quot;,sSegment);
+			Input.SetProperty(&quot;sAssetId&quot;,astId);
+			TheApplication().LogError(&apos;BC:QAB&apos;,&apos;sMSISDN : sCircle : sPaymentType: sPromSub : sPartNumOne : astId&apos;,sMSISDN+&apos;:&apos;+kCircle+&apos;:&apos;+sSegment+&apos;:&apos;+sPromSub+&apos;:&apos;+sPartNumOne+&apos;:&apos;+astId, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;);
+			Input.SetProperty(&quot;ProcessName&quot;,&quot;TM Activate Full DND WF&quot;);
+			bs.InvokeMethod(&quot;RunProcess&quot;,Input,Output);   
+			TheApplication().LogError(&apos;BC:QAB&apos;,&apos;DataStop&apos;,&apos;WF Call Done&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;, &apos;&apos;);
+		}
+		return (CancelOperation);                                         
+	}//try
+	catch(e)
+	{
+		throw e;  
+	}//catch(e)
+	finally
+	{
+		sLstValBC = null;
+		sLstValBO = null;
+		sAssetItemBC = null;
+		sAssetBO = null;
+		bc = null;
+		bo = null;
+		Input = null;
+		Output = null;
+		bs = null;
+	}
+}"
+			   SEQUENCE="3"
+			   UPDATED="11/12/2020 13:08:02"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/11/2020 21:45:24"
+			   CREATED_BY="SADMIN">
+			</BUSCOMP_SERVER_SCRIPT>
+			<BUSINESS_COMPONENT_USER_PROP
+			   INACTIVE="Y"
+			   NAME="Business Component Name"
+			   VALUE="TM Asset Indicator VBC"
+			   UPDATED="11/03/2017 20:54:38"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/03/2017 20:54:38"
+			   CREATED_BY="SADMIN">
+			</BUSINESS_COMPONENT_USER_PROP>
+			<BUSINESS_COMPONENT_USER_PROP
+			   COMMENTS="20160210:FORAMK: Added user property for read from file"
+			   INACTIVE="Y"
+			   NAME="Disable Execute"
+			   VALUE="N"
+			   UPDATED="11/03/2017 20:54:38"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/03/2017 20:54:38"
+			   CREATED_BY="SADMIN">
+			</BUSINESS_COMPONENT_USER_PROP>
+			<BUSINESS_COMPONENT_USER_PROP
+			   COMMENTS="20160210:FORAMK: Added user property for read from file"
+			   INACTIVE="Y"
+			   NAME="Enable Caching"
+			   VALUE="N"
+			   UPDATED="11/03/2017 20:54:38"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/03/2017 20:54:38"
+			   CREATED_BY="SADMIN">
+			</BUSINESS_COMPONENT_USER_PROP>
+			<BUSINESS_COMPONENT_USER_PROP
+			   COMMENTS="20160210:FORAMK: Added user property for read from file"
+			   INACTIVE="Y"
+			   NAME="Outgoing Integration Object Name"
+			   VALUE="TM Indicators IO"
+			   UPDATED="11/03/2017 20:54:38"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/03/2017 20:54:38"
+			   CREATED_BY="SADMIN">
+			</BUSINESS_COMPONENT_USER_PROP>
+			<BUSINESS_COMPONENT_USER_PROP
+			   COMMENTS="20160210:FORAMK: Added user property for read from file"
+			   INACTIVE="Y"
+			   NAME="ProcessName"
+			   VALUE="TM Indicators Workflow"
+			   UPDATED="11/03/2017 20:54:38"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/03/2017 20:54:38"
+			   CREATED_BY="SADMIN">
+			</BUSINESS_COMPONENT_USER_PROP>
+			<BUSINESS_COMPONENT_USER_PROP
+			   COMMENTS="20160210:FORAMK: Added user property for read from file"
+			   INACTIVE="Y"
+			   NAME="Service Name"
+			   VALUE="TM BS Asset Indicators VBC"
+			   UPDATED="11/03/2017 20:54:38"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/03/2017 20:54:38"
+			   CREATED_BY="SADMIN">
+			</BUSINESS_COMPONENT_USER_PROP>
+			<FIELD
+			   CALCULATED="N"
+			   COLUMN="ROW_ID"
+			   COMMENTS="SOMIK:06-05-2018:Made Field Force Active to handle Duplicate TV SRs"
+			   COMPOSITE="N"
+			   DISABLE_SEARCH="N"
+			   DISABLE_SORT="N"
+			   FORCE_ACTIVE="Y"
+			   HIDDEN="N"
+			   IMMEDIATE_POST_CHANGES="N"
+			   INACTIVE="N"
+			   LINK_SPECIFICATION="N"
+			   MESSAGE_DISPLAY_MODE="User Msg with Error Code Only"
+			   MULTI_VALUED="N"
+			   NAME="Asset Id"
+			   NO_COPY="N"
+			   READ_ONLY="N"
+			   REQUIRED="N"
+			   TEXT_LENGTH="15"
+			   TYPE="DTYPE_ID"
+			   USE_DEFAULT_SENSITIVITY="Y"
+			   UPDATED="05/06/2018 15:13:17"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/03/2017 20:54:38"
+			   CREATED_BY="SADMIN">
+			</FIELD>
+			<FIELD
+			   CALCULATED="Y"
+			   COMPOSITE="N"
+			   DISABLE_SEARCH="N"
+			   DISABLE_SORT="N"
+			   FORCE_ACTIVE="N"
+			   HIDDEN="N"
+			   IMMEDIATE_POST_CHANGES="N"
+			   INACTIVE="N"
+			   LINK_SPECIFICATION="N"
+			   MESSAGE_DISPLAY_MODE="User Msg with Error Code Only"
+			   MULTI_VALUED="N"
+			   NAME="MSISDN"
+			   NO_COPY="N"
+			   READ_ONLY="N"
+			   REQUIRED="N"
+			   TYPE="DTYPE_TEXT"
+			   USE_DEFAULT_SENSITIVITY="Y"
+			   UPDATED="11/03/2017 20:54:38"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/03/2017 20:54:38"
+			   CREATED_BY="SADMIN">
+			</FIELD>
+			<FIELD
+			   CALCULATED="N"
+			   COLUMN="OWNER_ACCNT_ID"
+			   COMPOSITE="N"
+			   DISABLE_SEARCH="N"
+			   DISABLE_SORT="N"
+			   FORCE_ACTIVE="Y"
+			   HIDDEN="N"
+			   IMMEDIATE_POST_CHANGES="N"
+			   INACTIVE="N"
+			   LINK_SPECIFICATION="N"
+			   MESSAGE_DISPLAY_MODE="User Msg with Error Code Only"
+			   MULTI_VALUED="N"
+			   NAME="Owner Account Id"
+			   NO_COPY="N"
+			   READ_ONLY="N"
+			   REQUIRED="N"
+			   TEXT_LENGTH="15"
+			   TYPE="DTYPE_ID"
+			   USE_DEFAULT_SENSITIVITY="Y"
+			   UPDATED="08/16/2018 11:54:07"
+			   UPDATED_BY="SADMIN"
+			   CREATED="08/16/2018 11:54:07"
+			   CREATED_BY="SADMIN">
+			</FIELD>
+			<FIELD
+			   CALCULATED="N"
+			   COLUMN="SERIAL_NUM"
+			   COMPOSITE="N"
+			   DISABLE_SEARCH="N"
+			   DISABLE_SORT="N"
+			   FORCE_ACTIVE="Y"
+			   HIDDEN="N"
+			   IMMEDIATE_POST_CHANGES="N"
+			   INACTIVE="N"
+			   LINK_SPECIFICATION="N"
+			   MESSAGE_DISPLAY_MODE="User Msg with Error Code Only"
+			   MULTI_VALUED="N"
+			   NAME="Serial Number"
+			   NO_COPY="N"
+			   READ_ONLY="N"
+			   REQUIRED="N"
+			   TEXT_LENGTH="100"
+			   TYPE="DTYPE_TEXT"
+			   USE_DEFAULT_SENSITIVITY="Y"
+			   UPDATED="08/16/2018 11:54:07"
+			   UPDATED_BY="SADMIN"
+			   CREATED="08/16/2018 11:54:07"
+			   CREATED_BY="SADMIN">
+			</FIELD>
+			<FIELD
+			   CALCULATED="Y"
+			   CALCULATED_VALUE="LoginName()"
+			   COMPOSITE="N"
+			   DISABLE_SEARCH="N"
+			   DISABLE_SORT="N"
+			   FORCE_ACTIVE="N"
+			   HIDDEN="N"
+			   IMMEDIATE_POST_CHANGES="N"
+			   INACTIVE="N"
+			   LINK_SPECIFICATION="N"
+			   MESSAGE_DISPLAY_MODE="User Msg with Error Code Only"
+			   MULTI_VALUED="N"
+			   NAME="TM Agent Id"
+			   NO_COPY="N"
+			   READ_ONLY="N"
+			   REQUIRED="N"
+			   TYPE="DTYPE_TEXT"
+			   USE_DEFAULT_SENSITIVITY="Y"
+			   UPDATED="08/16/2018 11:54:07"
+			   UPDATED_BY="SADMIN"
+			   CREATED="08/16/2018 11:54:07"
+			   CREATED_BY="SADMIN">
+			</FIELD>
+			<FIELD
+			   CALCULATED="Y"
+			   CALCULATED_VALUE="GetProfileAttr(&quot;Primary Org&quot;)"
+			   COMPOSITE="N"
+			   DISABLE_SEARCH="N"
+			   DISABLE_SORT="N"
+			   FORCE_ACTIVE="N"
+			   HIDDEN="N"
+			   IMMEDIATE_POST_CHANGES="N"
+			   INACTIVE="N"
+			   LINK_SPECIFICATION="N"
+			   MESSAGE_DISPLAY_MODE="User Msg with Error Code Only"
+			   MULTI_VALUED="N"
+			   NAME="TM Agent Name"
+			   NO_COPY="N"
+			   READ_ONLY="N"
+			   REQUIRED="N"
+			   TYPE="DTYPE_TEXT"
+			   USE_DEFAULT_SENSITIVITY="Y"
+			   UPDATED="08/16/2018 11:54:07"
+			   UPDATED_BY="SADMIN"
+			   CREATED="08/16/2018 11:54:07"
+			   CREATED_BY="SADMIN">
+			</FIELD>
+			<FIELD
+			   CALCULATED="N"
+			   COLUMN="NAME"
+			   COMPOSITE="N"
+			   DISABLE_SEARCH="N"
+			   DISABLE_SORT="N"
+			   FORCE_ACTIVE="Y"
+			   HIDDEN="N"
+			   IMMEDIATE_POST_CHANGES="N"
+			   INACTIVE="N"
+			   JOIN="S_BU"
+			   LINK_SPECIFICATION="N"
+			   MESSAGE_DISPLAY_MODE="User Msg with Error Code Only"
+			   MULTI_VALUED="N"
+			   NAME="TM Circle"
+			   NO_COPY="N"
+			   READ_ONLY="N"
+			   REQUIRED="N"
+			   TEXT_LENGTH="100"
+			   TYPE="DTYPE_TEXT"
+			   USE_DEFAULT_SENSITIVITY="Y"
+			   UPDATED="08/16/2018 11:54:07"
+			   UPDATED_BY="SADMIN"
+			   CREATED="08/16/2018 11:54:07"
+			   CREATED_BY="SADMIN">
+			</FIELD>
+			<FIELD
+			   CALCULATED="Y"
+			   COMPOSITE="N"
+			   DISABLE_SEARCH="N"
+			   DISABLE_SORT="N"
+			   FORCE_ACTIVE="N"
+			   HIDDEN="N"
+			   IMMEDIATE_POST_CHANGES="N"
+			   INACTIVE="N"
+			   LINK_SPECIFICATION="N"
+			   MESSAGE_DISPLAY_MODE="User Msg with Error Code Only"
+			   MULTI_VALUED="N"
+			   NAME="TM Indicator Name"
+			   NO_COPY="N"
+			   READ_ONLY="N"
+			   REQUIRED="N"
+			   TYPE="DTYPE_TEXT"
+			   USE_DEFAULT_SENSITIVITY="Y"
+			   UPDATED="11/03/2017 20:54:38"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/03/2017 20:54:38"
+			   CREATED_BY="SADMIN">
+			</FIELD>
+			<FIELD
+			   CALCULATED="N"
+			   COLUMN="BU_ID"
+			   COMPOSITE="N"
+			   DISABLE_SEARCH="N"
+			   DISABLE_SORT="N"
+			   FORCE_ACTIVE="Y"
+			   HIDDEN="N"
+			   IMMEDIATE_POST_CHANGES="N"
+			   INACTIVE="N"
+			   JOIN="S_ORG_EXT"
+			   LINK_SPECIFICATION="N"
+			   MESSAGE_DISPLAY_MODE="User Msg with Error Code Only"
+			   MULTI_VALUED="N"
+			   NAME="TM Organization Id"
+			   NO_COPY="N"
+			   READ_ONLY="N"
+			   REQUIRED="N"
+			   TEXT_LENGTH="15"
+			   TYPE="DTYPE_ID"
+			   USE_DEFAULT_SENSITIVITY="Y"
+			   UPDATED="08/16/2018 11:54:07"
+			   UPDATED_BY="SADMIN"
+			   CREATED="08/16/2018 11:54:07"
+			   CREATED_BY="SADMIN">
+			</FIELD>
+			<FIELD
+			   CALCULATED="Y"
+			   COMPOSITE="N"
+			   DISABLE_SEARCH="N"
+			   DISABLE_SORT="N"
+			   FORCE_ACTIVE="N"
+			   HIDDEN="N"
+			   IMMEDIATE_POST_CHANGES="N"
+			   INACTIVE="N"
+			   LINK_SPECIFICATION="N"
+			   MESSAGE_DISPLAY_MODE="User Msg with Error Code Only"
+			   MULTI_VALUED="N"
+			   NAME="TM Priority"
+			   NO_COPY="N"
+			   READ_ONLY="N"
+			   REQUIRED="N"
+			   TYPE="DTYPE_TEXT"
+			   USE_DEFAULT_SENSITIVITY="Y"
+			   UPDATED="11/03/2017 20:54:38"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/03/2017 20:54:38"
+			   CREATED_BY="SADMIN">
+			</FIELD>
+			<FIELD
+			   CALCULATED="Y"
+			   COMPOSITE="N"
+			   DISABLE_SEARCH="N"
+			   DISABLE_SORT="N"
+			   FORCE_ACTIVE="N"
+			   HIDDEN="N"
+			   IMMEDIATE_POST_CHANGES="N"
+			   INACTIVE="N"
+			   LINK_SPECIFICATION="N"
+			   MESSAGE_DISPLAY_MODE="User Msg with Error Code Only"
+			   MULTI_VALUED="N"
+			   NAME="TM Source System"
+			   NO_COPY="N"
+			   READ_ONLY="N"
+			   REQUIRED="N"
+			   TYPE="DTYPE_TEXT"
+			   USE_DEFAULT_SENSITIVITY="Y"
+			   UPDATED="11/03/2017 20:54:38"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/03/2017 20:54:38"
+			   CREATED_BY="SADMIN">
+			</FIELD>
+			<FIELD
+			   CALCULATED="Y"
+			   CALCULATED_VALUE="&quot;CTSongsIFrame_ORIG&quot;"
+			   COMPOSITE="N"
+			   DISABLE_SEARCH="N"
+			   DISABLE_SORT="N"
+			   FORCE_ACTIVE="N"
+			   HIDDEN="N"
+			   IMMEDIATE_POST_CHANGES="N"
+			   INACTIVE="N"
+			   LINK_SPECIFICATION="N"
+			   MESSAGE_DISPLAY_MODE="User Msg with Error Code Only"
+			   MULTI_VALUED="N"
+			   NAME="TM Ubona"
+			   NO_COPY="N"
+			   READ_ONLY="N"
+			   REQUIRED="N"
+			   TYPE="DTYPE_TEXT"
+			   USE_DEFAULT_SENSITIVITY="Y"
+			   UPDATED="08/16/2018 11:54:07"
+			   UPDATED_BY="SADMIN"
+			   CREATED="08/16/2018 11:54:07"
+			   CREATED_BY="SADMIN">
+			</FIELD>
+			<FIELD
+			   CALCULATED="Y"
+			   COMPOSITE="N"
+			   DISABLE_SEARCH="N"
+			   DISABLE_SORT="N"
+			   FORCE_ACTIVE="N"
+			   HIDDEN="N"
+			   IMMEDIATE_POST_CHANGES="N"
+			   INACTIVE="N"
+			   LINK_SPECIFICATION="N"
+			   MESSAGE_DISPLAY_MODE="User Msg with Error Code Only"
+			   MULTI_VALUED="N"
+			   NAME="TM Value1"
+			   NO_COPY="N"
+			   READ_ONLY="N"
+			   REQUIRED="N"
+			   TYPE="DTYPE_TEXT"
+			   USE_DEFAULT_SENSITIVITY="Y"
+			   UPDATED="11/03/2017 20:54:38"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/03/2017 20:54:38"
+			   CREATED_BY="SADMIN">
+			</FIELD>
+			<FIELD
+			   CALCULATED="Y"
+			   COMPOSITE="N"
+			   DISABLE_SEARCH="N"
+			   DISABLE_SORT="N"
+			   FORCE_ACTIVE="N"
+			   HIDDEN="N"
+			   IMMEDIATE_POST_CHANGES="N"
+			   INACTIVE="N"
+			   LINK_SPECIFICATION="N"
+			   MESSAGE_DISPLAY_MODE="User Msg with Error Code Only"
+			   MULTI_VALUED="N"
+			   NAME="TM Value2"
+			   NO_COPY="N"
+			   READ_ONLY="N"
+			   REQUIRED="N"
+			   TYPE="DTYPE_TEXT"
+			   USE_DEFAULT_SENSITIVITY="Y"
+			   UPDATED="11/03/2017 20:54:38"
+			   UPDATED_BY="SADMIN"
+			   CREATED="11/03/2017 20:54:38"
+			   CREATED_BY="SADMIN">
+			</FIELD>
+			<JOIN
+			   INACTIVE="N"
+			   NAME="S_BU"
+			   OUTER_JOIN_FLAG="N"
+			   TABLE="S_BU"
+			   UPDATED="08/16/2018 11:54:08"
+			   UPDATED_BY="SADMIN"
+			   CREATED="08/16/2018 11:54:07"
+			   CREATED_BY="SADMIN">
+				<JOIN_SPECIFICATION
+				   DESTINATION_COLUMN="PAR_ROW_ID"
+				   INACTIVE="N"
+				   NAME="TM Organization Id"
+				   SOURCE_FIELD="TM Organization Id"
+				   UPDATED="08/16/2018 11:54:08"
+				   UPDATED_BY="SADMIN"
+				   CREATED="08/16/2018 11:54:08"
+				   CREATED_BY="SADMIN">
+				</JOIN_SPECIFICATION>
+			</JOIN>
+			<JOIN
+			   INACTIVE="N"
+			   NAME="S_ORG_EXT"
+			   OUTER_JOIN_FLAG="N"
+			   TABLE="S_ORG_EXT"
+			   UPDATED="08/16/2018 11:54:08"
+			   UPDATED_BY="SADMIN"
+			   CREATED="08/16/2018 11:54:08"
+			   CREATED_BY="SADMIN">
+				<JOIN_SPECIFICATION
+				   DESTINATION_COLUMN="PAR_ROW_ID"
+				   INACTIVE="N"
+				   NAME="Owner Account Id"
+				   SOURCE_FIELD="Owner Account Id"
+				   UPDATED="08/16/2018 11:54:08"
+				   UPDATED_BY="SADMIN"
+				   CREATED="08/16/2018 11:54:08"
+				   CREATED_BY="SADMIN">
+				</JOIN_SPECIFICATION>
+			</JOIN>
+		</BUSINESS_COMPONENT>
+	</PROJECT>
+</REPOSITORY>
+
+
+
